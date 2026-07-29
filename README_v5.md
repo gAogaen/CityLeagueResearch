@@ -1,4 +1,4 @@
-# City League Analytics v5.0.0
+# City League Analytics v5.0.1
 
 ## 主な変更
 
@@ -13,7 +13,7 @@
 - 集計用の重複・一覧行を除外
 
 `data/cityleague_results.csv` は約26MBです。元CSVの約79MBから大幅に縮小しています。
-年度別CSVも同梱していますが、v5.0.0の画面は全年度版CSVを使用します。
+年度別CSVも同梱していますが、v5.0.1の画面は全年度版CSVを使用します。
 
 ## GitHubへの更新方法
 

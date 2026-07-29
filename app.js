@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "5.0.0";
+  const APP_VERSION = "5.0.1";
 
   const CONFIG = {
     password: "cityboy2026",

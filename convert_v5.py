@@ -22,12 +22,12 @@ def year(name,date):
  if not m:return 0
  y,mo=map(int,m.groups()); return y+1 if mo>=9 else y
 def pref_from_text(t):
+ # 元ページには住所表記の揺れが多いため、固定長の正規表現ではなく
+ # 47都道府県の正式名称を本文全体から直接検出する。
+ t=clean(t)
  if not t:return ''
- m=re.search(r'〒\s*\d{3}-?\d{4}[^\n\r]{0,100}?(北海道|京都府|大阪府|東京都|.{2,3}県)',t)
- if not m:m=re.search(r'開催地\s*[:：]\s*(北海道|京都府|大阪府|東京都|.{2,3}県)',t)
- if m:
-  v=m.group(1)
-  return v if v in PREFS else ''
+ for pref in PREFS:
+  if pref in t:return pref
  return ''
 def shop_from_text(t):
  m=re.search(r'主催者\s*[:：]\s*([^\n\r]+)',t or '')
@@ -63,6 +63,17 @@ with open(src,encoding='utf-8-sig',newline='') as f:
   cur['name']=cur.get('name') or clean(r.get('大会名'))
   cur['date']=cur.get('date') or clean(r.get('開催日'))
   meta[eid]=cur
+
+# 同じ会場名で都道府県が判明している大会から多数決マップを作成する。
+venue_pref_counts=defaultdict(lambda: defaultdict(int))
+for item in meta.values():
+ s=shop(item.get('shop','')); p=item.get('pref','')
+ if s and p: venue_pref_counts[s][p]+=1
+venue_pref={s:max(counts,key=counts.get) for s,counts in venue_pref_counts.items() if counts}
+for item in meta.values():
+ if not item.get('pref'):
+  item['pref']=venue_pref.get(shop(item.get('shop','')),'')
+
 headers=['開催日','シティ年度','大会名','会場名','開催都道府県','大会カテゴリ','順位','獲得CSP','プレイヤーID','プレイヤー名','大会ID','詳細URL']
 rows=[]; seen={}; stats=defaultdict(int)
 with open(src,encoding='utf-8-sig',newline='') as f:
@@ -83,7 +94,7 @@ with open(src,encoding='utf-8-sig',newline='') as f:
   date=clean(r.get('開催日')) or m.get('date',''); name=clean(r.get('大会名')) or m.get('name','')
   yr=year(name,date); category=cat(r.get('大会カテゴリ')) or cat(name)
   s=choose_shop(r.get('店名',''),m.get('shop',''))
-  p=m.get('pref','') or storemap.get(s,'') or pref_from_text(t)
+  p=m.get('pref','') or storemap.get(s,'') or venue_pref.get(shop(s),'') or pref_from_text(t)
   points=csp(t,rank,yr)
   pname=clean(r.get('プレイヤー名'))
   row=[date,yr,name,s,p,category,rank,points,pid,pname,eid,clean(r.get('詳細URL'))]
