@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "4.5.1";
+  const APP_VERSION = "4.6.0";
 
   const CONFIG = {
     password: "cityboy2026",
@@ -61,6 +61,7 @@
     activeTab: "results",
     strengthRows: [],
     strengthParent: null,
+    recommendRows: [],
     analysisCache: new Map()
   };
 
@@ -74,6 +75,7 @@
     bindTabs();
     bindSearchControls();
     bindStrengthControls();
+    bindRecommendControls();
 
     const versionLabel = $("appVersion");
     if (versionLabel) versionLabel.textContent = `v${APP_VERSION}`;
@@ -139,6 +141,14 @@
     });
   }
 
+  function bindRecommendControls() {
+    $("recommendApplyButton").addEventListener("click", renderRecommendations);
+    $("recommendCsvButton").addEventListener("click", exportRecommendationCsv);
+    ["recommendPrefectureFilter", "recommendYearFilter", "recommendCategoryFilter", "recommendRankFilter"].forEach((id) => {
+      $(id).addEventListener("change", renderRecommendations);
+    });
+  }
+
   function showLockScreen() {
     document.body.classList.add("auth-locked");
     document.body.classList.remove("authenticated");
@@ -164,7 +174,9 @@
     });
     $("resultsView").classList.toggle("active", tabName === "results");
     $("strengthView").classList.toggle("active", tabName === "strength");
+    $("recommendView").classList.toggle("active", tabName === "recommend");
     if (tabName === "strength" && state.loaded) renderStrength();
+    if (tabName === "recommend" && state.loaded) renderRecommendations();
   }
 
   async function loadData() {
@@ -473,14 +485,19 @@
     fillSelect($("resultPrefectureFilter"), state.prefectures);
     fillSelect($("strengthPrefectureFilter"), state.prefectures);
     fillSelect($("strengthCategoryFilter"), state.categories);
+    fillSelect($("recommendPrefectureFilter"), state.prefectures);
+    fillSelect($("recommendCategoryFilter"), state.categories);
     $("resultCategoryFilter").value = "オープン";
     $("strengthCategoryFilter").value = "オープン";
+    $("recommendCategoryFilter").value = "オープン";
 
     state.years.forEach((year) => {
       const option = document.createElement("option");
       option.value = String(year);
       option.textContent = `シティリーグ${year}`;
       $("strengthYearFilter").appendChild(option);
+      const recommendOption = option.cloneNode(true);
+      $("recommendYearFilter").appendChild(recommendOption);
     });
   }
 
@@ -845,6 +862,115 @@
           <td><span class="trust ${item.trust}">${trustLabel(item.trust)}</span></td>
         </tr>`;
     }).join("");
+  }
+
+  function renderRecommendations() {
+    if (!state.loaded) return;
+    const prefecture = $("recommendPrefectureFilter").value;
+    const yearMode = $("recommendYearFilter").value;
+    const category = $("recommendCategoryFilter").value;
+    const rankMode = $("recommendRankFilter").value;
+    const result = calculateVenueRecommendations({ prefecture, yearMode, category, rankMode });
+    state.recommendRows = result.entities;
+    renderRecommendationCards(result.entities, result.context);
+    renderRecommendationTable(result.entities);
+    $("recommendSummary").textContent = `${result.context.yearLabel} / ${prefecture || "全国"} / ${category || "全カテゴリ"} / ${rankModeLabel(rankMode)} / ${formatNumber(result.context.eventCount)}大会`;
+  }
+
+  function calculateVenueRecommendations({ prefecture, yearMode, category, rankMode }) {
+    const targetYears = resolveTargetYears(yearMode);
+    const maxRank = rankMode === "top4" ? 4 : rankMode === "top8" ? 8 : Infinity;
+    const eligible = state.rows.filter((row) => {
+      if (!row.prefecture || !row.shop || !finite(row.annualPercentile) || !finite(row.annualCsp)) return false;
+      if (!targetYears.includes(row.seriesYear)) return false;
+      if (category && row.category !== category) return false;
+      if (row.rank > maxRank) return false;
+      if (prefecture && row.prefecture !== prefecture) return false;
+      return true;
+    });
+    const eventMap = groupBy(eligible, (row) => row.eventKey);
+    const eventStats = [];
+    eventMap.forEach((eventRows, eventKey) => {
+      const first = eventRows[0];
+      const percentiles = eventRows.map((row) => row.annualPercentile).filter(finite);
+      if (!percentiles.length) return;
+      eventStats.push({
+        eventKey,
+        entityKey: `${first.prefecture}|${first.shop}`,
+        seriesYear: first.seriesYear,
+        count: eventRows.length,
+        strength: mean(percentiles.map((value) => (value * value) / 100)),
+        medianPercentile: percentile(percentiles, 0.5),
+        q1Percentile: percentile(percentiles, 0.25),
+        top10Rate: percentiles.filter((value) => value >= 90).length / percentiles.length,
+        top25Rate: percentiles.filter((value) => value >= 75).length / percentiles.length
+      });
+    });
+    const baseline = eventStats.length ? weightedEventMetric(eventStats, targetYears, "strength") : 0;
+    const groupedEvents = groupBy(eventStats, (item) => item.entityKey);
+    const groupedRows = groupBy(eligible, (row) => `${row.prefecture}|${row.shop}`);
+    const entities = [];
+    groupedEvents.forEach((events, key) => {
+      const rows = groupedRows.get(key) || [];
+      const stats = calculateEntityStats(rows, events, targetYears, baseline);
+      const [venuePrefecture, ...shopParts] = key.split("|");
+      entities.push({
+        key,
+        label: shopParts.join("|"),
+        prefecture: venuePrefecture,
+        recommendationScore: Math.max(0, Math.min(100, 100 - stats.adjustedStrength)),
+        ...stats
+      });
+    });
+    entities.sort((a, b) => b.recommendationScore - a.recommendationScore || b.trust.localeCompare(a.trust) || b.eventCount - a.eventCount || a.label.localeCompare(b.label, "ja"));
+    const yearLabel = yearMode === "recent3" ? `直近3年（${targetYears.join("・")}）` : yearMode === "all" ? `全期間（${targetYears.join("・")}）` : `シティリーグ${yearMode}`;
+    return { entities, context: { targetYears, yearLabel, eventCount: eventStats.length, eligibleRows: eligible.length, prefecture } };
+  }
+
+  function renderRecommendationCards(entities, context) {
+    const reliable = entities.filter((item) => item.trust !== "low");
+    const best = reliable[0] || entities[0];
+    const cards = [
+      ["おすすめ1位", best ? best.label : "該当なし", best ? `${best.prefecture}・おすすめ度 ${formatDecimal(best.recommendationScore, 1)}` : "条件を変更してください"],
+      ["候補会場数", formatNumber(entities.length), `${context.yearLabel}・${context.prefecture || "全国"}`],
+      ["分析大会数", `${formatNumber(context.eventCount)}大会`, `${formatNumber(context.eligibleRows)}件のポイント圏結果`],
+      ["中～高信頼", `${formatNumber(reliable.length)}会場`, "大会数・選手数が一定以上の候補"]
+    ];
+    $("recommendCards").innerHTML = cards.map(([label, value, note]) => `<article class="metric-card"><span>${escapeHtml(label)}</span><b>${escapeHtml(String(value))}</b><small>${escapeHtml(note)}</small></article>`).join("");
+  }
+
+  function renderRecommendationTable(entities) {
+    if (!entities.length) {
+      $("recommendTableBody").innerHTML = `<tr><td colspan="10" class="empty">条件に一致する会場がありません。</td></tr>`;
+      return;
+    }
+    $("recommendTableBody").innerHTML = entities.map((item, index) => {
+      const scoreClass = item.recommendationScore >= 60 ? "high" : item.recommendationScore >= 40 ? "medium" : "low";
+      return `<tr>
+        <td>${index + 1}</td>
+        <td><span class="entity-name">${escapeHtml(item.label)}</span></td>
+        <td>${escapeHtml(item.prefecture)}</td>
+        <td class="number"><span class="score ${scoreClass}">${formatDecimal(item.recommendationScore, 1)}</span></td>
+        <td class="number">${formatDecimal(item.adjustedStrength, 1)}</td>
+        <td class="number">${formatPercent(item.top10Rate, 1)}</td>
+        <td class="number">上位 ${formatDecimal(100 - item.medianPercentile, 1)}%</td>
+        <td class="number">${formatNumber(item.eventCount)}</td>
+        <td class="number">${formatNumber(item.uniquePlayers)}</td>
+        <td><span class="trust ${item.trust}">${trustLabel(item.trust)}</span></td>
+      </tr>`;
+    }).join("");
+  }
+
+  function exportRecommendationCsv() {
+    const rows = state.recommendRows.map((item, index) => ({ rank: index + 1, ...item }));
+    const columns = [
+      ["おすすめ順位", "rank"], ["会場", "label"], ["開催都道府県", "prefecture"],
+      ["おすすめ度", "recommendationScore"], ["強豪選手集中度", "adjustedStrength"],
+      ["年間上位10%率", "top10Rate"], ["CSP中央値パーセンタイル", "medianPercentile"],
+      ["大会数", "eventCount"], ["ポイント圏延べ人数", "appearanceCount"],
+      ["ユニークプレイヤーID数", "uniquePlayers"], ["信頼度", "trust"]
+    ];
+    downloadObjectCsv("cityleague_venue_recommendations.csv", rows, columns);
   }
 
   function resolveTargetYears(mode) {

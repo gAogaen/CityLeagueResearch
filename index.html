@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="シティリーグ結果検索と、ポイント圏に入った選手の年間CSPを用いた強豪選手集中度分析" />
   <title>シティリーグ分析</title>
-  <link rel="stylesheet" href="./style.css?v=4.4.0" />
+  <link rel="stylesheet" href="./style.css?v=4.6.0" />
 </head>
 <body class="auth-locked">
   <div id="lockScreen" class="lock-screen">
@@ -31,7 +31,7 @@
       </div>
       <div class="hero-side">
         <div class="hero-number"><b id="totalCount">0</b><span>有効結果</span></div>
-        <small id="appVersion" aria-label="アプリバージョン">v4.4.0</small>
+        <small id="appVersion" aria-label="アプリバージョン">v4.6.0</small>
         <button id="logoutButton" class="ghost-button">ロック</button>
       </div>
     </header>
@@ -39,6 +39,7 @@
     <section class="tab-list" role="tablist" aria-label="機能切替">
       <button class="tab-button active" data-tab="results" role="tab" aria-selected="true">① 結果検索</button>
       <button class="tab-button" data-tab="strength" role="tab" aria-selected="false">② 強豪選手集中度</button>
+      <button class="tab-button" data-tab="recommend" role="tab" aria-selected="false">③ おすすめシティ会場</button>
     </section>
 
     <section id="loadingPanel" class="panel loading-panel">
@@ -200,9 +201,86 @@
         </details>
       </section>
     </section>
+
+
+    <section id="recommendView" class="view" role="tabpanel">
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <div class="section-kicker">VENUE RECOMMENDATION</div>
+            <h2>おすすめシティ会場</h2>
+            <p>指定条件のポイント圏データから、年間CSP上位選手に当たりにくい傾向の会場を提案します。</p>
+          </div>
+          <button id="recommendCsvButton" class="secondary-button">おすすめ結果CSV</button>
+        </div>
+        <div class="filter-grid strength-grid">
+          <label>
+            表示範囲
+            <select id="recommendPrefectureFilter"><option value="">全国</option></select>
+          </label>
+          <label>
+            対象年度
+            <select id="recommendYearFilter">
+              <option value="recent3">直近3年</option>
+              <option value="all">全期間</option>
+            </select>
+          </label>
+          <label>
+            カテゴリ
+            <select id="recommendCategoryFilter"><option value="">すべて</option></select>
+          </label>
+          <label>
+            対象順位帯
+            <select id="recommendRankFilter">
+              <option value="top8">TOP8固定</option>
+              <option value="all">ポイント圏すべて</option>
+              <option value="top4">TOP4固定</option>
+            </select>
+          </label>
+        </div>
+        <div class="button-row">
+          <button id="recommendApplyButton">おすすめを再計算</button>
+          <span id="recommendSummary" class="inline-summary">読み込み中...</span>
+        </div>
+      </section>
+
+      <section id="recommendCards" class="metric-grid"></section>
+
+      <section class="panel">
+        <div class="table-title-row">
+          <div>
+            <h3>強豪に当たりにくい会場ランキング</h3>
+            <p>おすすめ度は強豪選手集中度の低さを基準にし、少数データは全体平均へ補正しています。</p>
+          </div>
+          <div class="legend"><span class="dot high"></span>高信頼 <span class="dot medium"></span>中 <span class="dot low"></span>参考</div>
+        </div>
+        <div class="table-scroll">
+          <table class="analysis-table">
+            <thead><tr>
+              <th>#</th><th>会場</th><th>都道府県</th>
+              <th class="number">おすすめ度</th><th class="number">強豪集中度</th>
+              <th class="number">上位10%率</th><th class="number">CSP中央値帯</th>
+              <th class="number">大会数</th><th class="number">選手ID数</th><th>信頼度</th>
+            </tr></thead>
+            <tbody id="recommendTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel method-panel">
+        <details>
+          <summary>おすすめ度の見方と注意点</summary>
+          <div class="method-content">
+            <p><b>おすすめ度が高いほど、取得データ上は年間CSP上位の選手がポイント圏に入りにくい傾向です。</b></p>
+            <p>会場ごとの強豪選手集中度を反転して算出します。大会数や選手数が少ない会場は、偶然の偏りを抑えるため選択範囲全体の平均へ補正します。</p>
+            <p>全参加者ではなくポイント圏の結果に基づくため、当日の参加者全体や抽選倍率、定員、交通条件を保証するものではありません。</p>
+          </div>
+        </details>
+      </section>
+    </section>
   </main>
 
-  <script src="./config.js?v=4.4.0"></script>
-  <script src="./app.js?v=4.4.0"></script>
+  <script src="./config.js?v=4.6.0"></script>
+  <script src="./app.js?v=4.6.0"></script>
 </body>
 </html>
