@@ -247,7 +247,10 @@
         return;
       }
 
-      const playerId = normalizePlayerId(getAlias(raw, HEADER_ALIASES.playerId) || sourceText);
+      // プレイヤーIDは表示名ではなくIDを主キーとして扱う。
+      // CSVをExcel等で保存し直した際に先頭ゼロが失われても、10桁のIDへ復元する。
+      const directPlayerId = getAlias(raw, HEADER_ALIASES.playerId);
+      const playerId = normalizePlayerId(directPlayerId, true) || normalizePlayerId(sourceText, false);
       if (!playerId) {
         quality.excludedInvalidId += 1;
         return;
@@ -477,6 +480,9 @@
   function renderDataAlert() {
     const q = state.quality;
     const messages = [];
+    if (q.excludedInvalidId > 0) {
+      messages.push(`プレイヤーIDを判定できず除外した結果が${formatNumber(q.excludedInvalidId)}件あります。ID列の先頭ゼロ欠落や文字列化を確認してください。`);
+    }
     if (q.missingVenuePrefecture > 0) {
       messages.push(`開催都道府県を判定できない結果が${formatNumber(q.missingVenuePrefecture)}件あります。必要に応じて data/store_prefecture_map.csv に店舗と都道府県を追加してください。`);
     }
@@ -502,7 +508,7 @@
     const maxRank = parsePositiveInt($("resultRankFilter").value);
 
     state.filteredRows = state.rows.filter((row) => {
-      if (playerIdQuery && !row.playerId.includes(playerIdQuery)) return false;
+      if (playerIdQuery && !playerIdMatches(row.playerId, playerIdQuery)) return false;
       if (shopQuery && !normalizeSearch(row.shop).includes(shopQuery)) return false;
       if (prefecture && row.prefecture !== prefecture) return false;
       if (year && String(row.seriesYear) !== year) return false;
@@ -937,11 +943,42 @@
     return locationMatch ? normalizePrefecture(locationMatch[1]) : "";
   }
 
-  function normalizePlayerId(value) {
-    const digits = normalizeDigits(value);
-    const matches = String(value || "").match(new RegExp(`\\d{${CONFIG.minimumPlayerIdDigits},12}`, "g"));
-    if (matches?.length) return matches[0];
-    return digits.length >= CONFIG.minimumPlayerIdDigits && digits.length <= 12 ? digits : "";
+  function normalizePlayerId(value, allowShortDirectValue = false) {
+    const raw = String(value || "").normalize("NFKC").trim();
+    if (!raw) return "";
+
+    // Excelなどで数値化され、科学表記になったIDも可能な範囲で復元する。
+    let normalizedRaw = raw;
+    if (/^\d+(?:\.\d+)?e[+-]?\d+$/i.test(raw)) {
+      const numeric = Number(raw);
+      if (Number.isSafeInteger(numeric)) normalizedRaw = String(numeric);
+    }
+
+    const minimumDigits = allowShortDirectValue ? 5 : CONFIG.minimumPlayerIdDigits;
+    const matches = normalizedRaw.match(new RegExp(`\\d{${minimumDigits},12}`, "g"));
+    if (!matches?.length) return "";
+
+    const digits = matches[0];
+    // 現行のプレイヤーIDは10桁表記。先頭ゼロが落ちたCSVは左側をゼロ埋めする。
+    return digits.length <= 10 ? digits.padStart(10, "0") : digits;
+  }
+
+  function playerIdMatches(rowPlayerId, queryValue) {
+    const rowDigits = normalizeDigits(rowPlayerId);
+    const queryDigits = normalizeDigits(queryValue);
+    if (!queryDigits) return true;
+    if (!rowDigits) return false;
+
+    // 完全な10桁ID、先頭ゼロ省略ID、IDの一部分のいずれでも検索可能。
+    if (rowDigits.includes(queryDigits)) return true;
+    const rowCore = rowDigits.replace(/^0+/, "") || "0";
+    const queryCore = queryDigits.replace(/^0+/, "") || "0";
+    if (rowCore.includes(queryCore)) return true;
+
+    if (queryDigits.length <= 10) {
+      return rowDigits === queryDigits.padStart(10, "0");
+    }
+    return false;
   }
 
   function normalizeEventId(value) {
@@ -1057,7 +1094,8 @@
   }
 
   function normalizeDigits(value) {
-    return String(value || "").replace(/\D/g, "");
+    // 全角数字で入力されても検索できるよう、先にNFKC正規化する。
+    return String(value || "").normalize("NFKC").replace(/\D/g, "");
   }
 
   function normalizeSearch(value) {
