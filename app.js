@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "4.5.0";
+  const APP_VERSION = "4.5.1";
 
   const CONFIG = {
     password: "cityboy2026",
@@ -186,7 +186,7 @@
       state.latestNames = normalized.latestNames;
       state.quality = normalized.quality;
       state.years = uniqueSorted(state.rows.map((row) => row.seriesYear).filter(Boolean), true);
-      state.categories = uniqueSorted(state.rows.map((row) => row.category).filter(Boolean));
+      state.categories = ["オープン", "シニア", "ジュニア"];
       state.prefectures = uniqueSorted(state.rows.map((row) => row.prefecture).filter(Boolean), false, prefectureOrder);
       state.loaded = true;
 
@@ -473,6 +473,8 @@
     fillSelect($("resultPrefectureFilter"), state.prefectures);
     fillSelect($("strengthPrefectureFilter"), state.prefectures);
     fillSelect($("strengthCategoryFilter"), state.categories);
+    $("resultCategoryFilter").value = "オープン";
+    $("strengthCategoryFilter").value = "オープン";
 
     state.years.forEach((year) => {
       const option = document.createElement("option");
@@ -1073,9 +1075,10 @@
     const text = cleanText(value);
     if (/ジュニア/.test(text)) return "ジュニア";
     if (/シニア/.test(text)) return "シニア";
-    if (/マスター/.test(text)) return "マスター";
-    if (/オープン/.test(text)) return "オープン";
-    return text;
+    // 旧データの「マスター」は現行画面ではオープンとして集約する。
+    if (/マスター|オープン/.test(text)) return "オープン";
+    // 主催者名など、カテゴリではない文字列を選択肢へ混入させない。
+    return "";
   }
 
   function extractCategory(eventName) {
