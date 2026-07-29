@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="シティリーグ結果検索と、ポイント圏に入った選手の年間CSPを用いた強豪選手集中度分析" />
+  <title>シティリーグ分析</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="lockScreen" class="lock-screen">
+    <div class="lock-card">
+      <div class="eyebrow">CITY LEAGUE ANALYTICS</div>
+      <h1>シティリーグ分析</h1>
+      <p>検索機能と強豪選手集中度の閲覧にはパスワードが必要です。</p>
+      <form id="passwordForm" class="password-form">
+        <input id="passwordInput" type="password" placeholder="パスワード" autocomplete="current-password" />
+        <button type="submit">入場</button>
+      </form>
+      <p id="passwordError" class="error" hidden>パスワードが違います。</p>
+      <p class="small-note">GitHub Pagesの簡易ロックです。重要情報の保護には使用しないでください。</p>
+    </div>
+  </div>
+
+  <main id="app" class="app" hidden>
+    <header class="hero">
+      <div>
+        <div class="eyebrow hero-eyebrow">CITY LEAGUE ANALYTICS</div>
+        <h1>シティリーグ分析</h1>
+        <p>プレイヤーIDを主キーとして、結果検索とポイント圏の強豪選手集中度を分析します。</p>
+      </div>
+      <div class="hero-side">
+        <div class="hero-number"><b id="totalCount">0</b><span>有効結果</span></div>
+        <button id="logoutButton" class="ghost-button">ロック</button>
+      </div>
+    </header>
+
+    <section class="tab-list" role="tablist" aria-label="機能切替">
+      <button class="tab-button active" data-tab="results" role="tab" aria-selected="true">① 結果検索</button>
+      <button class="tab-button" data-tab="strength" role="tab" aria-selected="false">② 強豪選手集中度</button>
+    </section>
+
+    <section id="loadingPanel" class="panel loading-panel">
+      <div class="spinner" aria-hidden="true"></div>
+      <div>
+        <b>データを読み込んでいます</b>
+        <p id="loadingMessage">CSVを取得中...</p>
+      </div>
+    </section>
+
+    <section id="dataAlert" class="alert" hidden></section>
+
+    <section id="resultsView" class="view active" role="tabpanel">
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <div class="section-kicker">RESULT SEARCH</div>
+            <h2>シティリーグ結果検索</h2>
+            <p>プレイヤーID・会場名・開催都道府県を組み合わせて検索できます。</p>
+          </div>
+          <button id="resultCsvButton" class="secondary-button">検索結果CSV</button>
+        </div>
+
+        <div class="filter-grid search-grid">
+          <label>
+            プレイヤーID
+            <input id="playerIdFilter" type="search" inputmode="numeric" placeholder="例：0042986346" />
+          </label>
+          <label>
+            会場名
+            <input id="shopFilter" type="search" placeholder="例：バトロコ" />
+          </label>
+          <label>
+            開催都道府県
+            <select id="resultPrefectureFilter"><option value="">全国</option></select>
+          </label>
+          <label>
+            シリーズ年度
+            <select id="resultYearFilter"><option value="">全年度</option></select>
+          </label>
+          <label>
+            カテゴリ
+            <select id="resultCategoryFilter"><option value="">すべて</option></select>
+          </label>
+          <label>
+            順位
+            <select id="resultRankFilter">
+              <option value="">ポイント圏すべて</option>
+              <option value="1">優勝</option>
+              <option value="4">TOP4</option>
+              <option value="8">TOP8</option>
+              <option value="16">TOP16</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="button-row">
+          <button id="searchButton">検索</button>
+          <button id="searchResetButton" class="secondary-button">条件クリア</button>
+          <span id="resultSummary" class="inline-summary">読み込み中...</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div id="searchResults" class="result-list"></div>
+        <div class="pager">
+          <button id="prevPageButton" class="secondary-button">前へ</button>
+          <span id="pageInfo">-</span>
+          <button id="nextPageButton" class="secondary-button">次へ</button>
+        </div>
+      </section>
+    </section>
+
+    <section id="strengthView" class="view" role="tabpanel">
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <div class="section-kicker">FIELD STRENGTH</div>
+            <h2>ポイント圏の強豪選手集中度</h2>
+            <p>全参加者ではなく、取得データに含まれるポイント圏選手の年間CSP分布を分析します。</p>
+          </div>
+          <button id="strengthCsvButton" class="secondary-button">分析結果CSV</button>
+        </div>
+
+        <div class="filter-grid strength-grid">
+          <label>
+            表示範囲
+            <select id="strengthPrefectureFilter"><option value="">全国（都道府県一覧）</option></select>
+          </label>
+          <label>
+            対象年度
+            <select id="strengthYearFilter">
+              <option value="recent3">直近3年</option>
+              <option value="all">全期間</option>
+            </select>
+          </label>
+          <label>
+            カテゴリ
+            <select id="strengthCategoryFilter"><option value="">すべて</option></select>
+          </label>
+          <label>
+            対象順位帯
+            <select id="strengthRankFilter">
+              <option value="top8">TOP8固定</option>
+              <option value="all">ポイント圏すべて</option>
+              <option value="top4">TOP4固定</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="button-row">
+          <button id="strengthApplyButton">再集計</button>
+          <span id="strengthSummary" class="inline-summary">読み込み中...</span>
+        </div>
+      </section>
+
+      <section id="strengthCards" class="metric-grid"></section>
+
+      <section class="panel">
+        <div class="table-title-row">
+          <div>
+            <h3 id="strengthTableTitle">都道府県別 強豪選手集中度</h3>
+            <p id="strengthTableDescription">都道府県を選択すると、その県の店舗一覧へ切り替わります。</p>
+          </div>
+          <div class="legend"><span class="dot high"></span>高信頼 <span class="dot medium"></span>中 <span class="dot low"></span>参考</div>
+        </div>
+        <div class="table-scroll">
+          <table class="analysis-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th id="entityHeader">都道府県</th>
+                <th class="number">集中度</th>
+                <th class="number">CSP中央値帯</th>
+                <th class="number">第25百分位</th>
+                <th class="number">上位10%率</th>
+                <th class="number">平均年間CSP</th>
+                <th class="number">CSP標準偏差</th>
+                <th class="number">大会数</th>
+                <th class="number">選手ID数</th>
+                <th>推移</th>
+                <th>信頼度</th>
+              </tr>
+            </thead>
+            <tbody id="strengthTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel method-panel">
+        <details>
+          <summary>強豪選手集中度の計算方法と注意点</summary>
+          <div class="method-content">
+            <p><b>プレイヤーの同一人物判定は、すべてプレイヤーIDで行います。</b> 登録名は表示用で、名前変更があっても別人として扱いません。</p>
+            <p>各プレイヤーの年間CSPを同年度・同カテゴリ内のパーセンタイルに変換し、上位ほど差が付くようパーセンタイルを二乗して大会単位で平均します。複数年は直近年度を重くし、サンプルが少ない会場は全国または県平均へ縮約します。</p>
+            <p>CSVに「年間CSP」列があればその値を優先します。ない場合は、取得済みシティリーグ結果の獲得CSPをプレイヤーID単位で合算します。この場合、トレーナーズリーグ等を含む公式年間総CSPとは一致しません。</p>
+            <p>この指標が示すのは「ポイント圏に入った選手層の強さ」です。大会の全参加者を取得していないため、会場全体の参加者レベルを直接示すものではありません。</p>
+          </div>
+        </details>
+      </section>
+    </section>
+  </main>
+
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
