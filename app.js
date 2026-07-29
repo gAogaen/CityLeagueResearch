@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "4.6.0";
+  const APP_VERSION = "5.0.0";
 
   const CONFIG = {
     password: "cityboy2026",
@@ -180,14 +180,14 @@
   }
 
   async function loadData() {
-    setLoading("店舗・都道府県マッピングを確認中...");
+    setLoading("軽量データの準備中...");
     try {
       state.storeMap = await loadStoreMap(CONFIG.storeMapUrl);
       setLoading("シティリーグ結果CSVを取得中...");
       const response = await fetch(versionedUrl(CONFIG.dataUrl), { cache: "reload" });
       if (!response.ok) throw new Error(`CSVを取得できませんでした（HTTP ${response.status}）`);
       let text = await response.text();
-      setLoading("CSVを解析し、プレイヤーID単位で年間CSPを集計中...");
+      setLoading("軽量CSVを解析し、プレイヤーID単位で年間CSPを集計中...");
       await nextFrame();
       const rawRows = parseCsv(text);
       text = ""; // 大容量CSV文字列を早めに解放し、iPhoneのメモリ使用量を抑える
