@@ -73,6 +73,8 @@
 
     if (sessionStorage.getItem("cityleague-auth") === "ok") {
       showApp();
+    } else {
+      showLockScreen();
     }
   }
 
@@ -130,9 +132,19 @@
     });
   }
 
+  function showLockScreen() {
+    document.body.classList.add("auth-locked");
+    document.body.classList.remove("authenticated");
+    $("lockScreen").hidden = false;
+    $("app").hidden = true;
+  }
+
   function showApp() {
+    document.body.classList.remove("auth-locked");
+    document.body.classList.add("authenticated");
     $("lockScreen").hidden = true;
     $("app").hidden = false;
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     if (!state.loaded) loadData();
   }
 
