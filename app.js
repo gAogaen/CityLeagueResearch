@@ -1,13 +1,14 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "4.4.0";
+  const APP_VERSION = "4.5.0";
 
   const CONFIG = {
     password: "cityboy2026",
     dataUrl: "./data/cityleague_results.csv",
     storeMapUrl: "./data/store_prefecture_map.csv",
-    pageSize: 40,
+    pageSize: 30,
+    maxSearchResults: 1000,
     recencyDecay: 0.70,
     shrinkageN: 24,
     minimumPlayerIdDigits: 8,
@@ -48,6 +49,7 @@
     loaded: false,
     rows: [],
     filteredRows: [],
+    filteredTotal: 0,
     playerAnnual: new Map(),
     latestNames: new Map(),
     years: [],
@@ -172,11 +174,13 @@
       setLoading("シティリーグ結果CSVを取得中...");
       const response = await fetch(versionedUrl(CONFIG.dataUrl), { cache: "reload" });
       if (!response.ok) throw new Error(`CSVを取得できませんでした（HTTP ${response.status}）`);
-      const text = await response.text();
+      let text = await response.text();
       setLoading("CSVを解析し、プレイヤーID単位で年間CSPを集計中...");
       await nextFrame();
       const rawRows = parseCsv(text);
+      text = ""; // 大容量CSV文字列を早めに解放し、iPhoneのメモリ使用量を抑える
       const normalized = normalizeDataset(rawRows, state.storeMap);
+      rawRows.length = 0;
       state.rows = normalized.rows;
       state.playerAnnual = normalized.playerAnnual;
       state.latestNames = normalized.latestNames;
@@ -191,7 +195,7 @@
       $("loadingPanel").hidden = true;
       renderDataAlert();
       applySearch();
-      renderStrength();
+      // 集中度分析はタブを開いた時だけ計算し、初期表示時の負荷を抑える
     } catch (error) {
       console.error(error);
       $("loadingPanel").innerHTML = `<div class="error"><b>読み込みに失敗しました。</b><p>${escapeHtml(error.message)}</p></div>`;
@@ -518,16 +522,24 @@
     const category = $("resultCategoryFilter").value;
     const maxRank = parsePositiveInt($("resultRankFilter").value);
 
-    state.filteredRows = state.rows.filter((row) => {
-      if (playerIdQuery && !playerIdMatches(row.playerId, playerIdQuery)) return false;
-      if (shopQuery && !normalizeSearch(row.shop).includes(shopQuery)) return false;
-      if (prefecture && row.prefecture !== prefecture) return false;
-      if (year && String(row.seriesYear) !== year) return false;
-      if (category && row.category !== category) return false;
-      if (maxRank && row.rank > maxRank) return false;
-      return true;
-    }).sort(compareRows);
+    const matchedRows = [];
+    let matchedTotal = 0;
 
+    // 全件を別配列へ複製せず、表示上限分だけ保持する。
+    // これによりiPhone Safariでのメモリ急増を抑える。
+    state.rows.forEach((row) => {
+      if (playerIdQuery && !playerIdMatches(row.playerId, playerIdQuery)) return;
+      if (shopQuery && !normalizeSearch(row.shop).includes(shopQuery)) return;
+      if (prefecture && row.prefecture !== prefecture) return;
+      if (year && String(row.seriesYear) !== year) return;
+      if (category && row.category !== category) return;
+      if (maxRank && row.rank > maxRank) return;
+      matchedTotal += 1;
+      if (matchedRows.length < CONFIG.maxSearchResults) matchedRows.push(row);
+    });
+
+    state.filteredRows = matchedRows.sort(compareRows);
+    state.filteredTotal = matchedTotal;
     state.currentPage = 1;
     renderSearchResults();
   }
@@ -545,8 +557,9 @@
   }
 
   function renderSearchResults() {
-    const total = state.filteredRows.length;
-    const maxPage = Math.max(1, Math.ceil(total / CONFIG.pageSize));
+    const displayedTotal = state.filteredRows.length;
+    const actualTotal = state.filteredTotal;
+    const maxPage = Math.max(1, Math.ceil(displayedTotal / CONFIG.pageSize));
     state.currentPage = Math.min(state.currentPage, maxPage);
     const start = (state.currentPage - 1) * CONFIG.pageSize;
     const pageRows = state.filteredRows.slice(start, start + CONFIG.pageSize);
@@ -554,7 +567,10 @@
     const searchedId = normalizeDigits($("playerIdFilter").value);
     const normalizedSearchedId = searchedId ? normalizePlayerId(searchedId, true) : "";
     const idSummary = normalizedSearchedId ? ` / 検索ID ${normalizedSearchedId}` : "";
-    $("resultSummary").textContent = `${formatNumber(total)}件 / プレイヤーID ${formatNumber(new Set(state.filteredRows.map((row) => row.playerId)).size)}名${idSummary}`;
+    const limitNote = actualTotal > displayedTotal
+      ? `（表示は先頭${formatNumber(displayedTotal)}件まで。条件を追加して絞り込んでください）`
+      : "";
+    $("resultSummary").textContent = `${formatNumber(actualTotal)}件 / プレイヤーID ${formatNumber(new Set(state.filteredRows.map((row) => row.playerId)).size)}名${idSummary}${limitNote}`;
     $("pageInfo").textContent = `${state.currentPage} / ${maxPage}ページ`;
     $("prevPageButton").disabled = state.currentPage <= 1;
     $("nextPageButton").disabled = state.currentPage >= maxPage;
