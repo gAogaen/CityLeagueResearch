@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+  const APP_VERSION = "4.4.0";
+
   const CONFIG = {
     password: "cityboy2026",
     dataUrl: "./data/cityleague_results.csv",
@@ -70,6 +72,9 @@
     bindTabs();
     bindSearchControls();
     bindStrengthControls();
+
+    const versionLabel = $("appVersion");
+    if (versionLabel) versionLabel.textContent = `v${APP_VERSION}`;
 
     if (sessionStorage.getItem("cityleague-auth") === "ok") {
       showApp();
@@ -165,7 +170,7 @@
     try {
       state.storeMap = await loadStoreMap(CONFIG.storeMapUrl);
       setLoading("シティリーグ結果CSVを取得中...");
-      const response = await fetch(CONFIG.dataUrl, { cache: "no-store" });
+      const response = await fetch(versionedUrl(CONFIG.dataUrl), { cache: "reload" });
       if (!response.ok) throw new Error(`CSVを取得できませんでした（HTTP ${response.status}）`);
       const text = await response.text();
       setLoading("CSVを解析し、プレイヤーID単位で年間CSPを集計中...");
@@ -197,7 +202,7 @@
     const map = new Map();
     if (!url) return map;
     try {
-      const response = await fetch(url, { cache: "no-store" });
+      const response = await fetch(versionedUrl(url), { cache: "reload" });
       if (!response.ok) return map;
       const rows = parseCsv(await response.text());
       rows.forEach((row) => {
@@ -209,6 +214,12 @@
       console.warn("店舗都道府県マップを読み込めませんでした。", error);
     }
     return map;
+  }
+
+  function versionedUrl(url) {
+    if (!url) return url;
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}appv=${encodeURIComponent(APP_VERSION)}`;
   }
 
   function setLoading(message) {
@@ -540,7 +551,10 @@
     const start = (state.currentPage - 1) * CONFIG.pageSize;
     const pageRows = state.filteredRows.slice(start, start + CONFIG.pageSize);
 
-    $("resultSummary").textContent = `${formatNumber(total)}件 / プレイヤーID ${formatNumber(new Set(state.filteredRows.map((row) => row.playerId)).size)}名`;
+    const searchedId = normalizeDigits($("playerIdFilter").value);
+    const normalizedSearchedId = searchedId ? normalizePlayerId(searchedId, true) : "";
+    const idSummary = normalizedSearchedId ? ` / 検索ID ${normalizedSearchedId}` : "";
+    $("resultSummary").textContent = `${formatNumber(total)}件 / プレイヤーID ${formatNumber(new Set(state.filteredRows.map((row) => row.playerId)).size)}名${idSummary}`;
     $("pageInfo").textContent = `${state.currentPage} / ${maxPage}ページ`;
     $("prevPageButton").disabled = state.currentPage <= 1;
     $("nextPageButton").disabled = state.currentPage >= maxPage;

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="シティリーグ結果検索と、ポイント圏に入った選手の年間CSPを用いた強豪選手集中度分析" />
   <title>シティリーグ分析</title>
-  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="./style.css?v=4.4.0" />
 </head>
 <body class="auth-locked">
   <div id="lockScreen" class="lock-screen">
@@ -31,6 +31,7 @@
       </div>
       <div class="hero-side">
         <div class="hero-number"><b id="totalCount">0</b><span>有効結果</span></div>
+        <small id="appVersion" aria-label="アプリバージョン">v4.4.0</small>
         <button id="logoutButton" class="ghost-button">ロック</button>
       </div>
     </header>
@@ -64,7 +65,7 @@
         <div class="filter-grid search-grid">
           <label>
             プレイヤーID
-            <input id="playerIdFilter" type="search" inputmode="numeric" placeholder="例：402837 または 0000402837" />
+            <input id="playerIdFilter" type="search" inputmode="numeric" placeholder="例：0042986346" />
           </label>
           <label>
             会場名
@@ -201,7 +202,7 @@
     </section>
   </main>
 
-  <script src="./config.js"></script>
-  <script src="./app.js"></script>
+  <script src="./config.js?v=4.4.0"></script>
+  <script src="./app.js?v=4.4.0"></script>
 </body>
 </html>
