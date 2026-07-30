@@ -121,15 +121,6 @@ python tools/validate_csv.py data/cityleague_results.csv
 
 プレイヤーID、開催都道府県、CSPの不足件数を確認できます。
 
-## パスワード
-
-初期値は以下です。
-
-```text
-cityboy2026
-```
-
-GitHub Pages上のJavaScriptに書かれた簡易ロックであり、本格的な認証ではありません。
 
 ## 公式配点の根拠
 
